@@ -1,0 +1,1 @@
+*/5 * * * * root exec /usr/bin/flock -n /var/lock/script.lock /bin/bash -c ". /run/supervisord.env; /usr/bin/script.sh | sponge /opt/node_exporter/textfile_collector/kafka_tools_topic_log_dir_size_bytes.prom"

@@ -1,0 +1,91 @@
+---
+### Unicred - Azure Pipelines
+variables:
+  appName: $(Build.Repository.Name)
+
+pool:
+  name: unicred-local
+
+parameters:
+- name: envSite
+  displayName: Deploy to?
+  type: string
+  values:
+  - TST
+  - HLG
+  - PRD
+- name: build
+  displayName: Build?
+  type: boolean
+
+trigger: none
+
+resources:
+  repositories:
+  - repository: templates
+    type: git
+    name: TI/azure-pipelines-templates
+
+stages:
+- stage: BUILD
+  jobs:
+  - job: docker_build
+    steps:
+    - task: Docker@2
+      displayName: build | Build-Push docker image to registry
+      inputs:
+        containerRegistry: 'docker-registry-infra'
+        repository: 'unicred/$(appName)'
+        command: 'buildAndPush'
+        Dockerfile: '**/Dockerfile'
+        tags: |
+          latest
+    condition: and(succeeded(), eq('${{ parameters.build }}', true))
+  - job: artifact
+    steps:
+    - script: |
+        cd $(System.DefaultWorkingDirectory)/k8s/${ENVSITE}/bases
+        kustomize build . > $(System.DefaultWorkingDirectory)/k8s/deploy.yaml
+      env:
+        ENVSITE: ${{ lower(parameters.envSite) }}
+      displayName: 'Create yaml file'
+    - publish: $(System.DefaultWorkingDirectory)/k8s
+      artifact: manifest
+      displayName: "Publish artifact"
+- stage: DEPLOY
+  jobs:
+  - job: deploy_${{ parameters.envSite }}
+    steps:
+    - download: current
+      artifact: manifest
+    - script: |
+        NAMESPACE=$(yq r $PIPELINE_WORKSPACE/manifest/bases/kustomization.yaml namespace)
+        echo "##vso[task.setvariable variable=appNamespace;isOutput=true]$NAMESPACE"
+      name: param
+      displayName: "Get namespace"
+    - task: Kubernetes@1
+      inputs:
+        connectionType: 'Kubernetes Service Connection'
+        kubernetesServiceEndpoint: 'kubernetes-local_${{ lower(parameters.envSite) }}'
+        namespace: $(param.appNamespace)
+        command: 'apply'
+        arguments: '--force=true'
+        useConfigurationFile: true
+        configuration: '$(Pipeline.Workspace)/manifest/deploy.yaml'
+        secretType: 'dockerRegistry'
+        containerRegistryType: 'Container Registry'
+        dockerRegistryEndpoint: 'docker-registry-group'
+        versionSpec: '1.15.12'
+      displayName: 'kubectl | apply resources'
+    - task: Kubernetes@1
+      inputs:
+        connectionType: 'Kubernetes Service Connection'
+        kubernetesServiceEndpoint: 'kubernetes-local_${{ lower(parameters.envSite) }}'
+        namespace: $(param.appNamespace)
+        command: 'rollout'
+        arguments: 'status deployment $(appName)'
+        secretType: 'dockerRegistry'
+        containerRegistryType: 'Container Registry'
+        dockerRegistryEndpoint: 'docker-registry-group'
+        versionSpec: '1.15.12'
+      displayName: 'kubectl | status rollout'

@@ -1,0 +1,16 @@
+---
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: infra
+
+commonAnnotations:
+  unicred.info/owner: Juan Enciso
+  unicred.info/team: Arquitetura
+
+commonLabels:
+  app: kafka-tools-exporter
+
+resources:
+- app/deployment.yaml
+- app/service.yaml

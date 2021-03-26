@@ -1,0 +1,30 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka-tools-exporter
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka-tools-exporter
+  template:
+    metadata:
+      labels:
+        app: kafka-tools-exporter
+      annotations:
+        prometheus.io/path: /metrics
+        prometheus.io/port: "9100"
+        prometheus.io/scrape: "true"
+    spec:
+      containers:
+      - name: kafka-tools-exporter
+        image: nexus.e-unicred.com.br:18443/unicred/kafka-tools-exporter
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: KAFKA_SERVERS
+          value: "localhost:9092"
+        ports:
+        - containerPort: 9100
+          name: http
+          protocol: TCP

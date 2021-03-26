@@ -1,0 +1,15 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka-tools-exporter
+spec:
+  replicas: 1
+  template:
+    spec:
+      containers:
+      - name: kafka-tools-exporter
+        imagePullPolicy: Always
+        env:
+        - name: KAFKA_SERVERS
+          value: "10.64.14.84:9092,10.64.14.85:9092,10.64.14.86:9092"
